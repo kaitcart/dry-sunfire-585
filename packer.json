@@ -1,0 +1,125 @@
+{
+    "variables": {
+        "atlas_username": "CHANGME"
+    },
+    "builders": [
+      {
+        "type": "virtualbox-iso",
+        "boot_command": [
+                "<tab> text ks=http://{{ .HTTPIP }}:{{ .HTTPPort }}/ks.cfg<enter><wait>"
+	],
+	"headless": true,
+	"hard_drive_interface": "sata",
+	"boot_wait": "30s",
+	"disk_size": 40960,
+	"http_directory": "http",
+	"output_directory": "packer-riak-virtualbox",
+        "guest_os_type": "RedHat_64",
+        "iso_url": "http://mirrors.kernel.org/centos/6.8/isos/x86_64/CentOS-6.8-x86_64-minimal.iso",
+        "iso_checksum": "0ca12fe5f28c2ceed4f4084b41ff8a0b",
+        "iso_checksum_type": "md5",
+        "ssh_username": "vagrant",
+        "ssh_password": "vagrant",
+	"ssh_port": 22,
+        "ssh_wait_timeout": "10000s",
+        "shutdown_command": "echo 'vagrant' | sudo -S /sbin/halt -h -p",
+        "guest_additions_path": "VBoxGuestAdditions_{{.Version}}.iso",
+        "virtualbox_version_file": ".vbox_version",
+        "vboxmanage": [
+        [
+          "modifyvm",
+          "{{.Name}}",
+          "--memory",
+          "1024"
+        ],
+        [
+          "modifyvm",
+          "{{.Name}}",
+          "--cpus",
+          "1"
+        ]
+      ]
+      },
+      {
+        "type": "vmware-iso",
+	"boot_command": [
+                "<tab> text ks=http://{{ .HTTPIP }}:{{ .HTTPPort }}/ks.cfg<enter><wait>"
+	],
+	"boot_wait": "30s",
+        "disk_size": 40960,
+        "headless": true,
+        "http_directory": "http",
+	"guest_os_type": "centos-64",
+	"output_directory": "packer-riak-vmware",
+	"iso_url": "http://mirrors.kernel.org/centos/6.8/isos/x86_64/CentOS-6.8-x86_64-minimal.iso",
+        "iso_checksum": "0ca12fe5f28c2ceed4f4084b41ff8a0b",
+        "iso_checksum_type": "md5",
+        "ssh_username": "vagrant",
+	"ssh_password": "vagrant",
+        "ssh_port": 22,
+        "ssh_wait_timeout": "10000s",
+        "shutdown_command": "echo 'vagrant' | sudo -S /sbin/halt -h -p",
+        "tools_upload_flavor": "linux",
+	"vmx_data": {
+          "cpuid.coresPerSocket": "1",
+          "memsize": "1024",
+          "numvcpus": "1"
+        }
+      }
+    ],
+    "push": {
+      "name": "{{user `atlas_username`}}/riak-example",
+      "vcs": false
+    },
+    "provisioners": [
+    {
+      "type": "shell",
+      "scripts": [
+        "scripts/sshd.sh",
+	"scripts/networking.sh",
+        "scripts/vagrant.sh",
+        "scripts/vmtools.sh",
+	"scripts/riak.sh",
+        "scripts/cleanup.sh",
+        "scripts/zerodisk.sh"
+      ],
+      "override": {
+        "virtualbox-iso": {
+          "execute_command": "echo 'vagrant'|sudo -S bash '{{.Path}}'"
+        },
+        "vmware-iso": {
+          "execute_command": "echo 'vagrant'|sudo -S bash '{{.Path}}'"
+        }
+      }
+    } 
+    ],
+    "post-processors": [
+      [
+	{
+          "type": "vagrant",
+          "compression_level": 9,
+          "keep_input_artifact": false
+        },
+      	{
+          "type": "atlas",
+          "only": ["vmware-iso"],
+          "artifact": "{{user `atlas_username`}}/riak-example",
+          "artifact_type": "vagrant.box",
+          "metadata": {
+            "provider": "vmware_desktop",
+            "version": "0.0.5"
+          }
+        },
+        {
+          "type": "atlas",
+          "only": ["virtualbox-iso"],
+          "artifact": "{{user `atlas_username`}}/riak-example",
+          "artifact_type": "vagrant.box",
+          "metadata": {
+            "provider": "virtualbox",
+            "version": "0.0.5"
+          }
+        }
+      ]  
+    ]  
+}
